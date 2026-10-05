@@ -1,0 +1,39 @@
+# ---- secrets & local state (never commit) ----
+.env
+.env.*
+!.env.example
+.venv/
+.test-venv/
+venv/
+
+# ---- python caches / build ----
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+
+# ---- runtime data ----
+*.db
+*.sqlite
+*.sqlite3
+*.log
+output/
+
+# ---- archives ----
+*.zip
+
+# ---- local-only helper / dev scratch (not part of the product) ----
+_v0*.py
+_v4_*.py
+run-v4-test.cmd
+run-v4-test.ps1
+set-gemini-key.ps1
+set-secret.ps1
+set-qq-creds.ps1
+0-*.cmd
+1-抓取QQ目标.cmd
+4-*.cmd
+qq-markdown-preview-test.cmd.tmp
+_probe_write.txt

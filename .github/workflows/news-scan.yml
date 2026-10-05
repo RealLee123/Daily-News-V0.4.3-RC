@@ -1,0 +1,51 @@
+# 两小时一次扫描：抓取 → 去重 → Embedding → 聚类 → AI 评估 → breaking 判断
+#
+# 时区：GitHub 的 cron 一律按 UTC 计算，程序内部则使用 Asia/Shanghai（UTC+8）。
+#   本文件用「奇数小时 :10 UTC」=> 北京时间 09:10 / 11:10 / ... / 23:10 / 01:10 / 03:10 / 05:10 / 07:10，每天 12 次。
+#   这样排的好处：09:10 与 21:10 两次扫描分别落在早报(09:30 关窗)和晚报(21:30 关窗)前 20 分钟，
+#   日报不会因为「最后一次扫描太早」而漏掉窗口末尾的事件。
+#   选 :10 而不是 :00 是为了错开 GitHub 上最拥挤的整点调度队列。
+
+name: news-scan
+
+on:
+  schedule:
+    - cron: "10 1-23/2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 上一轮没结束就排队，不要并发跑两轮扫描（会重复消耗 AI 调用）
+concurrency:
+  group: news-scan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      PYTHONUNBUFFERED: "1"          # 进度日志实时刷出，不是结束时一次性吐出
+      PYTHONIOENCODING: utf-8
+      AI_PROVIDER: gemini
+      TIMEZONE: Asia/Shanghai
+      MORNING_TIME: "09:30"
+      EVENING_TIME: "21:30"
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      QQ_APP_ID: ${{ secrets.QQ_APP_ID }}
+      QQ_APP_SECRET: ${{ secrets.QQ_APP_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -e .
+
+      - name: Scan
+        run: python -m daily_news news-scan

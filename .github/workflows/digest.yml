@@ -1,0 +1,74 @@
+# 早晚报推送。日报只读取数据库里已处理的 Event，不采集（采集由 news-scan 负责）。
+#
+# 时区：GitHub 的 cron 一律按 UTC 计算，程序内部使用 Asia/Shanghai（UTC+8）。
+#   01:30 UTC = 北京 09:30 -> 早报（窗口 昨天 21:30 → 今天 09:30）
+#   13:30 UTC = 北京 21:30 -> 晚报（窗口 今天 09:30 → 今天 21:30）
+# 两条 schedule 都指向同一个 job，由 job 内第一步按 cron 反推期次，避免重复一份作业定义。
+#
+# 幂等：重复执行（或手动重跑）不会重复推送——程序按「期次:窗口起点日期」查
+# deliveries 表，已投递则打印「本期已经推送，跳过重复发送」并以 0 退出。
+
+name: digest
+
+on:
+  schedule:
+    - cron: "30 1 * * *"
+    - cron: "30 13 * * *"
+  workflow_dispatch:
+    inputs:
+      edition:
+        description: "手动运行时发哪一期"
+        type: choice
+        options:
+          - morning
+          - evening
+        default: evening
+
+permissions:
+  contents: read
+
+concurrency:
+  group: digest
+  cancel-in-progress: false
+
+jobs:
+  edition:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONUNBUFFERED: "1"
+      PYTHONIOENCODING: utf-8
+      AI_PROVIDER: gemini
+      TIMEZONE: Asia/Shanghai
+      MORNING_TIME: "09:30"
+      EVENING_TIME: "21:30"
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      QQ_APP_ID: ${{ secrets.QQ_APP_ID }}
+      QQ_APP_SECRET: ${{ secrets.QQ_APP_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -e .
+
+      - name: Pick edition
+        id: pick
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            edition="${{ github.event.inputs.edition }}"
+          elif [ "${{ github.event.schedule }}" = "30 1 * * *" ]; then
+            edition="morning"
+          else
+            edition="evening"
+          fi
+          echo "edition=$edition" >> "$GITHUB_OUTPUT"
+          echo "本期次：$edition"
+
+      - name: Push edition
+        run: python -m daily_news "${{ steps.pick.outputs.edition }}"

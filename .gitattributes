@@ -1,0 +1,22 @@
+# Normalize line endings: LF in the repository, CRLF on Windows checkout for scripts.
+* text=auto
+
+# Windows scripts must be CRLF when checked out, otherwise cmd.exe mangles multi-line files.
+*.cmd  text eol=crlf
+*.bat  text eol=crlf
+*.ps1  text eol=crlf
+
+# Everything else stays LF.
+*.py   text eol=lf
+*.md   text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+*.ini  text eol=lf
+
+# Binary / data
+*.db     binary
+*.sqlite binary
+*.png    binary
+*.jpg    binary
+*.ico    binary
+*.pdf    binary
